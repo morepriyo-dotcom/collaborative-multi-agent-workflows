@@ -4,8 +4,12 @@ import { MemoryItem, MemoryCategory } from '@/types/memory';
 import fs from 'fs';
 import path from 'path';
 
+import os from 'os';
+
 const COLLECTION_NAME = process.env.QDRANT_COLLECTION_NAME || 'flowmesh_memories';
-const LOCAL_STORE_PATH = path.join(process.cwd(), '.data', 'memories.json');
+const IS_VERCEL = Boolean(process.env.VERCEL);
+const DATA_DIR = IS_VERCEL ? os.tmpdir() : path.join(process.cwd(), '.data');
+const LOCAL_STORE_PATH = path.join(DATA_DIR, 'memories.json');
 
 // In-memory fallback / local vector pool cache
 interface StoredMemoryRecord {
@@ -16,31 +20,32 @@ interface StoredMemoryRecord {
 let localStoreCache: StoredMemoryRecord[] | null = null;
 
 function ensureDataDirectory() {
-  const dir = path.join(process.cwd(), '.data');
-  if (!fs.existsSync(dir)) {
+  if (!fs.existsSync(DATA_DIR)) {
     try {
-      fs.mkdirSync(dir, { recursive: true });
+      fs.mkdirSync(DATA_DIR, { recursive: true });
     } catch {
-      // ignore
+      // ignore in environments where directory creation is restricted
     }
   }
 }
 
 function loadLocalStore(): StoredMemoryRecord[] {
-  if (localStoreCache) return localStoreCache;
+  if (localStoreCache && localStoreCache.length > 0) return localStoreCache;
 
   ensureDataDirectory();
-  if (fs.existsSync(LOCAL_STORE_PATH)) {
-    try {
+  try {
+    if (fs.existsSync(LOCAL_STORE_PATH)) {
       const data = fs.readFileSync(LOCAL_STORE_PATH, 'utf-8');
       localStoreCache = JSON.parse(data);
-      return localStoreCache || [];
-    } catch (err) {
-      console.warn('Error reading local memory cache:', err);
+      if (Array.isArray(localStoreCache) && localStoreCache.length > 0) {
+        return localStoreCache;
+      }
     }
+  } catch (err) {
+    console.warn('Notice: Using in-memory store (file cache not accessible):', err);
   }
 
-  localStoreCache = [];
+  localStoreCache = localStoreCache || [];
   return localStoreCache;
 }
 
@@ -50,7 +55,7 @@ function saveLocalStore(records: StoredMemoryRecord[]) {
   try {
     fs.writeFileSync(LOCAL_STORE_PATH, JSON.stringify(records, null, 2), 'utf-8');
   } catch (err) {
-    console.warn('Error writing local memory cache:', err);
+    // In serverless environments, memory cache in localStoreCache still persists across warm invocations
   }
 }
 
