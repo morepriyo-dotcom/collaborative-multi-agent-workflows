@@ -1,6 +1,8 @@
 import { NextResponse } from 'next/server';
 import { getAllMemories, initVectorStore } from '@/lib/qdrant/vectorStore';
 
+export const dynamic = 'force-dynamic';
+
 export async function GET() {
   try {
     await initVectorStore();

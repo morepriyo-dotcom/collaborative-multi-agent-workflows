@@ -3,6 +3,8 @@ import { checkQdrantHealth } from '@/lib/qdrant/client';
 import { checkLyzrHealth } from '@/lib/lyzr/client';
 import { checkOmiConnection } from '@/lib/omi/client';
 
+export const dynamic = 'force-dynamic';
+
 export async function GET() {
   try {
     const [qdrant, lyzr, omi] = await Promise.all([
