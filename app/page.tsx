@@ -54,34 +54,106 @@ export default function Home() {
     return () => clearInterval(interval);
   }, []);
 
+  const abortControllerRef = React.useRef<AbortController | null>(null);
+
   const handleStartWorkflow = async (
     transcript: string,
-    voiceSource: 'omi' | 'browser_dev' | 'text_direct' = 'browser_dev'
+    voiceSource: 'omi' | 'browser_dev' | 'text_direct' = 'browser_dev',
+    retryRole?: AgentRole
   ) => {
+    if (abortControllerRef.current) {
+      abortControllerRef.current.abort();
+    }
+    const controller = new AbortController();
+    abortControllerRef.current = controller;
+
     setIsExecuting(true);
     setHasPendingApproval(false);
 
-    // Initial state setup
-    const initialWf = createInitialWorkflow(transcript, voiceSource);
-    initialWf.status = 'listening';
-    setWorkflow(initialWf);
+    // Initial state setup if not retrying a specific stage
+    if (!retryRole) {
+      const initialWf = createInitialWorkflow(transcript, voiceSource);
+      initialWf.status = 'listening';
+      setWorkflow(initialWf);
+    }
 
     try {
-      const res = await fetch('/api/workflow/run', {
+      const res = await fetch('/api/workflow/stream', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ userInput: transcript, voiceSource }),
+        body: JSON.stringify({
+          userInput: transcript,
+          voiceSource,
+          retryRole,
+          existingWorkflow: retryRole ? workflow : undefined,
+        }),
+        signal: controller.signal,
       });
 
-      const data = await res.json();
-      if (data.workflow) {
-        setWorkflow(data.workflow);
-        setHasPendingApproval(true);
+      if (!res.ok || !res.body) {
+        throw new Error(`SSE stream failed: ${res.statusText}`);
       }
-    } catch (err) {
-      console.error('Error running workflow:', err);
+
+      const reader = res.body.getReader();
+      const decoder = new TextDecoder('utf-8');
+      let buffer = '';
+
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+
+        buffer += decoder.decode(value, { stream: true });
+        const parts = buffer.split('\n\n');
+        buffer = parts.pop() || '';
+
+        for (const block of parts) {
+          const trimmed = block.trim();
+          if (!trimmed) continue;
+
+          const dataMatch = trimmed.match(/data:\s*(.+)$/m);
+          if (dataMatch) {
+            try {
+              const parsed = JSON.parse(dataMatch[1]);
+              if (parsed.workflow) {
+                setWorkflow(parsed.workflow);
+                if (parsed.workflow.status === 'completed') {
+                  setHasPendingApproval(true);
+                }
+              }
+            } catch (err) {
+              console.warn('Failed to parse SSE payload:', err);
+            }
+          }
+        }
+      }
+    } catch (err: any) {
+      if (err.name === 'AbortError') {
+        console.log('Workflow aborted by user.');
+      } else {
+        console.warn('SSE streaming encountered error, attempting HTTP fallback:', err);
+        try {
+          const fallbackRes = await fetch('/api/workflow/run', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              userInput: transcript,
+              voiceSource,
+              retryRole,
+              existingWorkflow: retryRole ? workflow : undefined,
+            }),
+          });
+          const data = await fallbackRes.json();
+          if (data.workflow) {
+            setWorkflow(data.workflow);
+            setHasPendingApproval(true);
+          }
+        } catch (fbErr) {
+          console.error('Fallback execution failed:', fbErr);
+        }
+      }
     } finally {
       setIsExecuting(false);
+      abortControllerRef.current = null;
     }
   };
 
@@ -126,6 +198,10 @@ export default function Home() {
   };
 
   const handleCancel = () => {
+    if (abortControllerRef.current) {
+      abortControllerRef.current.abort();
+      abortControllerRef.current = null;
+    }
     setIsExecuting(false);
     setWorkflow((prev) => ({
       ...prev,
@@ -137,7 +213,7 @@ export default function Home() {
           timestamp: new Date().toISOString(),
           timeFormatted: new Date().toLocaleTimeString(),
           stage: 'Human Override',
-          message: 'Workflow cancelled by operator.',
+          message: 'Workflow cancelled by operator via Human Control Bar.',
           type: 'error',
         },
       ],
@@ -145,7 +221,11 @@ export default function Home() {
   };
 
   const handleRetryAgent = () => {
-    handleStartWorkflow(workflow.userInput, workflow.voiceSource as any);
+    if (selectedAgentRole) {
+      handleStartWorkflow(workflow.userInput, workflow.voiceSource as any, selectedAgentRole);
+    } else {
+      handleStartWorkflow(workflow.userInput, workflow.voiceSource as any);
+    }
   };
 
   const handleApproveAction = () => {
@@ -199,6 +279,7 @@ export default function Home() {
               onRetryAgent={handleRetryAgent}
               onApproveAction={handleApproveAction}
               hasPendingApproval={hasPendingApproval}
+              selectedRole={selectedAgentRole}
             />
 
             {/* Observable Workflow Split View: Animated DAG Graph + Live Event Stream */}

@@ -3,6 +3,7 @@
 import React from 'react';
 import { Pause, Play, XOctagon, RotateCw, CheckCircle, ShieldCheck } from 'lucide-react';
 import { WorkflowStatus } from '@/types/workflow';
+import { AgentRole } from '@/types/agent';
 
 interface HumanControlBarProps {
   status: WorkflowStatus;
@@ -12,6 +13,7 @@ interface HumanControlBarProps {
   onRetryAgent: () => void;
   onApproveAction: () => void;
   hasPendingApproval: boolean;
+  selectedRole?: AgentRole | null;
 }
 
 export const HumanControlBar: React.FC<HumanControlBarProps> = ({
@@ -22,6 +24,7 @@ export const HumanControlBar: React.FC<HumanControlBarProps> = ({
   onRetryAgent,
   onApproveAction,
   hasPendingApproval,
+  selectedRole,
 }) => {
   const isRunning =
     status !== 'idle' &&
@@ -67,7 +70,7 @@ export const HumanControlBar: React.FC<HumanControlBarProps> = ({
           className="px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700 flex items-center gap-1.5 transition-colors disabled:opacity-40 disabled:cursor-not-allowed font-medium"
         >
           <RotateCw className="h-3 w-3" />
-          Retry Stage
+          {selectedRole ? `Retry ${selectedRole.charAt(0).toUpperCase() + selectedRole.slice(1)} Stage` : 'Retry Pipeline'}
         </button>
 
         {/* Cancel */}

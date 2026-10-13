@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useEffect, useRef } from 'react';
-import { Mic, MicOff, ArrowRight, Sparkles, Volume2, Radio } from 'lucide-react';
+import { Mic, MicOff, ArrowRight, Sparkles, Volume2, Radio, Smartphone, Terminal, CheckCircle2 } from 'lucide-react';
 
 interface VoiceInputHeroProps {
   onStartWorkflow: (transcript: string, voiceSource: 'omi' | 'browser_dev' | 'text_direct') => void;
@@ -9,21 +9,34 @@ interface VoiceInputHeroProps {
   voiceSource: 'omi' | 'browser_dev';
 }
 
-const OFFICIAL_DEMO_PROMPT =
-  'Help me prepare for my upcoming AI hackathon. Remember my previous project experience, research what I need to prepare, identify my weak areas, create a prioritized preparation plan, and check whether the plan covers everything.';
+const DEMO_PRESETS = [
+  {
+    label: 'Official Hackathon Demo',
+    text: 'Help me prepare for my upcoming AI hackathon. Remember my previous project experience, research what I need to prepare, identify my weak areas, create a prioritized preparation plan, and check whether the plan covers everything.',
+  },
+  {
+    label: 'Enterprise Microservices System',
+    text: 'Design an autonomous event-driven microservices architecture for a fintech platform. Query past architectural decisions from memory, identify compliance risks, and generate an implementation roadmap.',
+  },
+  {
+    label: 'Autonomous Agent Launch',
+    text: 'Plan the deployment and evaluation of a multi-agent customer support system. Factor in latency constraints, verify vector database dependencies, and establish human-in-the-loop audit gates.',
+  },
+];
 
 export const VoiceInputHero: React.FC<VoiceInputHeroProps> = ({
   onStartWorkflow,
   isExecuting,
-  voiceSource,
+  voiceSource: initialVoiceSource,
 }) => {
   const [isRecording, setIsRecording] = useState(false);
-  const [transcript, setTranscript] = useState(OFFICIAL_DEMO_PROMPT);
+  const [activeSource, setActiveSource] = useState<'browser_dev' | 'omi' | 'text_direct'>(initialVoiceSource);
+  const [transcript, setTranscript] = useState(DEMO_PRESETS[0].text);
   const [recognitionSupported, setRecognitionSupported] = useState(false);
+  const [omiWebhookStatus, setOmiWebhookStatus] = useState<string | null>(null);
   const recognitionRef = useRef<any>(null);
 
   useEffect(() => {
-    // Check Web Speech API support in browser
     if (typeof window !== 'undefined') {
       const SpeechRecognition =
         (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
@@ -42,6 +55,7 @@ export const VoiceInputHero: React.FC<VoiceInputHeroProps> = ({
           }
           if (currentTranscript.trim()) {
             setTranscript(currentTranscript);
+            setActiveSource('browser_dev');
           }
         };
 
@@ -68,6 +82,7 @@ export const VoiceInputHero: React.FC<VoiceInputHeroProps> = ({
     } else {
       setTranscript('');
       setIsRecording(true);
+      setActiveSource('browser_dev');
       if (recognitionRef.current) {
         try {
           recognitionRef.current.start();
@@ -75,7 +90,6 @@ export const VoiceInputHero: React.FC<VoiceInputHeroProps> = ({
           // ignore already started
         }
       } else {
-        // Simulated speech capture for browsers without Web Speech
         simulateAudioCapture();
       }
     }
@@ -83,7 +97,7 @@ export const VoiceInputHero: React.FC<VoiceInputHeroProps> = ({
 
   const simulateAudioCapture = () => {
     let index = 0;
-    const words = OFFICIAL_DEMO_PROMPT.split(' ');
+    const words = DEMO_PRESETS[0].text.split(' ');
     const interval = setInterval(() => {
       index += 3;
       setTranscript(words.slice(0, index).join(' '));
@@ -94,10 +108,41 @@ export const VoiceInputHero: React.FC<VoiceInputHeroProps> = ({
     }, 280);
   };
 
+  const handleSimulateOmiWebhook = async () => {
+    setOmiWebhookStatus('Sending test webhook to /api/omi/webhook...');
+    const simulatedSpeech =
+      'Omi Wearable Voice Ingestion: I have an autonomous AI hackathon next week. Retrieve my past failure modes, research scoring criteria, analyze vulnerabilities, and formulate an executable plan.';
+    try {
+      const res = await fetch('/api/omi/webhook', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          event: 'memory_created',
+          device_id: 'omi_wearable_hardware_v2',
+          battery_level: 92,
+          memory: {
+            transcript: simulatedSpeech,
+          },
+        }),
+      });
+      const data = await res.json();
+      if (data.success) {
+        setTranscript(simulatedSpeech);
+        setActiveSource('omi');
+        setOmiWebhookStatus('Omi wearable webhook verified & transcript loaded!');
+        setTimeout(() => setOmiWebhookStatus(null), 4000);
+      } else {
+        setOmiWebhookStatus('Webhook returned error: ' + (data.error || 'Failed'));
+      }
+    } catch (err: any) {
+      setOmiWebhookStatus('Webhook call error: ' + err.message);
+    }
+  };
+
   const handleSubmit = (e?: React.FormEvent) => {
     if (e) e.preventDefault();
     if (!transcript.trim() || isExecuting) return;
-    onStartWorkflow(transcript.trim(), voiceSource);
+    onStartWorkflow(transcript.trim(), activeSource);
   };
 
   return (
@@ -122,6 +167,53 @@ export const VoiceInputHero: React.FC<VoiceInputHeroProps> = ({
           specialized autonomous agents backed by Qdrant vector memory and Lyzr orchestration.
         </p>
 
+        {/* Ingestion Mode Selector */}
+        <div className="flex items-center justify-center gap-2 mb-6 flex-wrap">
+          <button
+            type="button"
+            onClick={() => setActiveSource('browser_dev')}
+            className={`px-3 py-1.5 rounded-lg text-xs font-medium border flex items-center gap-1.5 transition-colors ${
+              activeSource === 'browser_dev'
+                ? 'bg-indigo-600/30 border-indigo-500/60 text-indigo-300 shadow-sm'
+                : 'bg-slate-900/60 border-slate-800 text-slate-400 hover:text-slate-300'
+            }`}
+          >
+            <Mic className="h-3.5 w-3.5" />
+            Browser Speech API
+          </button>
+          <button
+            type="button"
+            onClick={handleSimulateOmiWebhook}
+            className={`px-3 py-1.5 rounded-lg text-xs font-medium border flex items-center gap-1.5 transition-colors ${
+              activeSource === 'omi'
+                ? 'bg-emerald-600/30 border-emerald-500/60 text-emerald-300 shadow-sm'
+                : 'bg-slate-900/60 border-slate-800 text-slate-400 hover:text-slate-300'
+            }`}
+          >
+            <Smartphone className="h-3.5 w-3.5 text-emerald-400" />
+            Simulate Omi Webhook Ingestion
+          </button>
+          <button
+            type="button"
+            onClick={() => setActiveSource('text_direct')}
+            className={`px-3 py-1.5 rounded-lg text-xs font-medium border flex items-center gap-1.5 transition-colors ${
+              activeSource === 'text_direct'
+                ? 'bg-purple-600/30 border-purple-500/60 text-purple-300 shadow-sm'
+                : 'bg-slate-900/60 border-slate-800 text-slate-400 hover:text-slate-300'
+            }`}
+          >
+            <Terminal className="h-3.5 w-3.5" />
+            Direct Text Mode
+          </button>
+        </div>
+
+        {omiWebhookStatus && (
+          <div className="mb-4 inline-flex items-center gap-2 px-3 py-1 rounded-full bg-emerald-950/80 border border-emerald-500/50 text-xs text-emerald-300 animate-in fade-in">
+            <CheckCircle2 className="h-3.5 w-3.5 text-emerald-400" />
+            <span>{omiWebhookStatus}</span>
+          </div>
+        )}
+
         {/* Main Voice Interaction Card */}
         <div className="glass-panel-elevated rounded-2xl p-6 md:p-8 max-w-3xl mx-auto relative group">
           {/* Audio Waveform when recording */}
@@ -144,6 +236,7 @@ export const VoiceInputHero: React.FC<VoiceInputHeroProps> = ({
               type="button"
               onClick={toggleRecording}
               disabled={isExecuting}
+              aria-label={isRecording ? 'Stop recording voice input' : 'Start recording voice input'}
               className={`relative h-24 w-24 md:h-28 md:w-28 rounded-full flex items-center justify-center transition-all duration-300 shadow-2xl ${
                 isExecuting
                   ? 'bg-slate-800 text-slate-600 cursor-not-allowed border border-slate-700'
@@ -167,16 +260,31 @@ export const VoiceInputHero: React.FC<VoiceInputHeroProps> = ({
             </p>
           </div>
 
+          {/* Preset Prompts */}
+          <div className="mb-4 flex items-center justify-center gap-1.5 flex-wrap">
+            <span className="text-[11px] text-slate-500 mr-1">Presets:</span>
+            {DEMO_PRESETS.map((preset, idx) => (
+              <button
+                key={idx}
+                type="button"
+                onClick={() => setTranscript(preset.text)}
+                className="px-2.5 py-1 rounded-md text-[11px] bg-slate-900/80 border border-slate-800 hover:border-slate-700 text-slate-300 hover:text-indigo-300 transition-colors"
+              >
+                {preset.label}
+              </button>
+            ))}
+          </div>
+
           {/* Editable Voice Transcript Area */}
           <form onSubmit={handleSubmit} className="space-y-4 text-left">
             <div>
               <div className="flex items-center justify-between text-xs text-slate-400 mb-2 px-1">
                 <span className="flex items-center gap-1.5 font-medium text-slate-300">
                   <Volume2 className="h-3.5 w-3.5 text-indigo-400" />
-                  Voice Request
+                  Voice Request (Editable Transcript)
                 </span>
-                <span className="text-[11px] text-slate-500">
-                  {voiceSource === 'omi' ? 'Transcribed via Omi' : 'Browser Web Speech API'}
+                <span className="text-[11px] text-slate-400 font-mono">
+                  Source: {activeSource === 'omi' ? 'Omi Wearable Webhook' : activeSource === 'browser_dev' ? 'Browser Web Speech' : 'Text Direct'}
                 </span>
               </div>
               <textarea
@@ -193,11 +301,11 @@ export const VoiceInputHero: React.FC<VoiceInputHeroProps> = ({
             <div className="flex flex-col sm:flex-row items-center justify-between gap-3">
               <button
                 type="button"
-                onClick={() => setTranscript(OFFICIAL_DEMO_PROMPT)}
+                onClick={() => setTranscript(DEMO_PRESETS[0].text)}
                 className="text-xs text-indigo-400 hover:text-indigo-300 transition-colors flex items-center gap-1"
               >
                 <Sparkles className="h-3 w-3" />
-                Reset to Official Hackathon Prompt
+                Reset Prompt
               </button>
 
               <button

@@ -9,6 +9,7 @@ import {
 import { storeMemory } from '../qdrant/vectorStore';
 import { MemoryItem } from '@/types/memory';
 import { executeAgentLLM } from './llmRunner';
+import { dynamicSynthesizeResult } from './dynamicReasoner';
 
 const SYSTEM_PROMPT = `You are FlowMesh Synthesizer Agent.
 Your responsibility: Synthesize all agent artifacts into a final executive deliverable.
@@ -39,6 +40,7 @@ export async function runSynthesizerAgent(
 ): Promise<{ output: SynthesizerAgentOutput; persistedMemories: MemoryItem[] }> {
   const userPrompt = `
 Goal: ${intent.goal}
+Domain: ${intent.domain}
 Plan Title: ${executorPlan.masterPlanTitle}
 Critic Score: ${criticReview.score} (${criticReview.reviewStatus})
 Milestones: ${executorPlan.keyMilestones.join(', ')}
@@ -51,6 +53,7 @@ Milestones: ${executorPlan.keyMilestones.join(', ')}
       systemPrompt: SYSTEM_PROMPT,
       userPrompt,
       responseFormat: 'json',
+      agentRole: 'synthesizer',
     });
 
     if (rawResult) {
@@ -60,57 +63,14 @@ Milestones: ${executorPlan.keyMilestones.join(', ')}
       }
     }
   } catch (err) {
-    console.warn('[SynthesizerAgent] LLM parsing failed, using consolidated synthesizer:', err);
+    console.warn('[SynthesizerAgent] LLM parsing failed, using dynamic synthesizer:', err);
   }
 
   if (!synthResult) {
-    synthResult = {
-      finalTitle: 'FlowMesh AI: Autonomous Hackathon Master Blueprint',
-      consolidatedPlan: `FlowMesh AI has successfully coordinated 7 specialized autonomous agents across voice transcription, Qdrant vector memory retrieval, parallel domain research, vulnerability analysis, executor drafting, critic auditing, and self-correcting revision. The resulting roadmap is optimized specifically for the official track "Collaborative Multi-Agent Workflows", fulfilling the 60%+ weighting on working software & observable agentic workflows, strictly adhering to the solo entry rule, integrating Omi + Qdrant + Lyzr, and enforcing a 4:30 minute ceiling on the submission video.`,
-      decisionsMade: [
-        'Executed parallel fan-out for Research and Vulnerability Analysis agents to minimize latency.',
-        'Enacted automated Critic revision loop to insert a strict 4:30 video timecode ceiling, eliminating user historical overflow risk.',
-        'Preserved strict connection truthfulness: dynamically routing to "Browser Voice — Development Mode" when hardware is not detected.',
-        'Extracted and stored 3 new persistent vectors back into Qdrant for continuous inter-workflow intelligence.',
-      ],
-      completedTasks: [
-        'Voice input intent deconstruction and constraint extraction',
-        'Semantic similarity lookup against Qdrant vector database',
-        'Lyzr multi-agent DAG schedule compilation',
-        'Parallel research on judging criteria (60%+ working software & observability)',
-        'Vulnerability identification and countermeasure modeling',
-        'Executor plan synthesis with P0/P1/P2 milestones',
-        'Critic Agent quality audit (Initial: 79% -> Revision Approved: 97%)',
-      ],
-      pendingOrActionableItems: [
-        'Record 4:15 minute demo video highlighting live voice triggering in first 30 seconds',
-        'Review public GitHub README for Mermaid diagram and clear environment variable documentation',
-        'Submit repository and video link on app.hidevs.xyz before deadline',
-      ],
-      newMemoriesToPersist: [
-        {
-          content: 'Workflow Insight: Critic Agent revision loop increased hackathon compliance score from 79% to 97% by enforcing a 4:30 demo video limit.',
-          category: 'system_learning',
-          importance: 5,
-          tags: ['critic_loop', 'hackathon_learning', 'demo_video', 'compliance'],
-        },
-        {
-          content: 'Project Experience: FlowMesh AI demonstrated live Omi voice input, Qdrant vector memory retrieval, and Lyzr multi-agent collaboration with real DAG observability.',
-          category: 'hackathon_experience',
-          importance: 5,
-          tags: ['flowmesh', 'qdrant', 'lyzr', 'omi', 'multi_agent'],
-        },
-        {
-          content: 'User Architectural Rule: Prioritize working software and observable agentic workflows (60%+ score) over superficial chat interfaces.',
-          category: 'preference',
-          importance: 5,
-          tags: ['judging_criteria', 'observability', 'best_practices'],
-        },
-      ],
-    };
+    synthResult = dynamicSynthesizeResult(intent, executorPlan, criticReview, research, analysis);
   }
 
-  // Actually store new memories in Qdrant!
+  // Persist high-value memories into Qdrant vector store
   const persistedMemories: MemoryItem[] = [];
   for (const mem of synthResult.newMemoriesToPersist) {
     try {

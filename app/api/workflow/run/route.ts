@@ -4,11 +4,16 @@ import { initVectorStore } from '@/lib/qdrant/vectorStore';
 
 export async function POST(req: NextRequest) {
   try {
-    const { userInput, voiceSource = 'browser_dev' } = await req.json();
+    const {
+      userInput,
+      voiceSource = 'browser_dev',
+      retryRole,
+      existingWorkflow,
+    } = await req.json();
 
-    if (!userInput || typeof userInput !== 'string' || userInput.trim().length === 0) {
+    if (!userInput && !existingWorkflow) {
       return NextResponse.json(
-        { success: false, error: 'Voice transcript or text input is required' },
+        { success: false, error: 'Voice transcript or existing workflow is required' },
         { status: 400 }
       );
     }
@@ -16,11 +21,14 @@ export async function POST(req: NextRequest) {
     // Ensure Qdrant vector store is ready
     await initVectorStore();
 
-    // Create workflow execution instance
-    const initialWorkflow = createInitialWorkflow(userInput.trim(), voiceSource);
-
-    // Execute multi-agent orchestration
-    const completedWorkflow = await executeMultiAgentWorkflow(initialWorkflow);
+    let completedWorkflow;
+    if (retryRole && existingWorkflow) {
+      const { retryWorkflowStage } = await import('@/lib/lyzr/orchestrator');
+      completedWorkflow = await retryWorkflowStage(existingWorkflow, retryRole);
+    } else {
+      const initialWorkflow = createInitialWorkflow(userInput.trim(), voiceSource);
+      completedWorkflow = await executeMultiAgentWorkflow(initialWorkflow);
+    }
 
     return NextResponse.json({
       success: completedWorkflow.status === 'completed',

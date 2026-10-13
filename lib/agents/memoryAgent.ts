@@ -32,10 +32,11 @@ export async function runMemoryAgent(
     return `Context Vector: ${m.content}`;
   });
 
+  const categories = Array.from(new Set(retrieved.map((m) => m.category))).join(', ') || 'general';
   const output: MemoryAgentOutput = {
     retrievedCount: retrieved.length,
     relevantMemories: formattedMemories,
-    contextSummary: `Successfully queried Qdrant vector store. Retrieved ${retrieved.length} relevant historical memory vectors covering user past hackathon experiences, identified weaknesses, user structural preferences, and judging rules.`,
+    contextSummary: `Successfully queried Qdrant vector store with semantic embeddings for "${searchQuery.slice(0, 50)}". Retrieved ${retrieved.length} relevant memory vectors across categories: ${categories}.`,
     appliedInsights,
   };
 
