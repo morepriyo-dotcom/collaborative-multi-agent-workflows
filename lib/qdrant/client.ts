@@ -38,11 +38,13 @@ export async function checkQdrantHealth(): Promise<{
   const client = getQdrantClient();
 
   if (!client) {
+    const { getStoredMemoryCount } = await import('./vectorStore');
+    const localCount = await getStoredMemoryCount().catch(() => 0);
     return {
       connected: false,
       provider: 'local_fallback',
       collectionName,
-      totalVectors: 0,
+      totalVectors: localCount,
       error: 'QDRANT_URL not configured in environment',
     };
   }
@@ -69,11 +71,13 @@ export async function checkQdrantHealth(): Promise<{
       latencyMs,
     };
   } catch (err: any) {
+    const { getStoredMemoryCount } = await import('./vectorStore');
+    const localCount = await getStoredMemoryCount().catch(() => 0);
     return {
       connected: false,
       provider: 'local_fallback',
       collectionName,
-      totalVectors: 0,
+      totalVectors: localCount,
       error: err?.message || 'Failed to ping Qdrant endpoint',
     };
   }

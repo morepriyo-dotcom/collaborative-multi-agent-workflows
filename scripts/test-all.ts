@@ -101,10 +101,10 @@ async function runAllTests() {
   assert(webhookRes.accepted === true, 'Omi webhook accepted');
   assert(webhookRes.triggerWorkflow === true, 'Omi memory_created triggered workflow readiness');
 
-  // TEST SUITE 5: Full End-to-End Autonomous Workflow Execution
-  console.log('\n▶ [SUITE 5] Live Multi-Agent Workflow Execution (with Critic Revision Loop)');
+  // TEST SUITE 5: Full End-to-End Autonomous Workflow Execution (Turn 1)
+  console.log('\n▶ [SUITE 5] Live Multi-Agent Workflow Execution (Turn 1: Hackathon Preparation)');
   const prompt =
-    'Help me prepare for my upcoming AI hackathon. Remember my previous project experience, research what I need to prepare, identify my weak areas, create a prioritized preparation plan, and check whether the plan covers everything.';
+    'Help me prepare for an AI hackathon. Identify the required deliverables, research the available requirements, create a prioritized checklist, verify the checklist for missing items, and remember my progress for my next session.';
 
   const wf = createInitialWorkflow(prompt, 'browser_dev');
   const progressStages: string[] = [];
@@ -124,9 +124,24 @@ async function runAllTests() {
   assert(progressStages.includes('synthesizing'), 'Observed stage: synthesizing');
   assert(completed.agents.executor.revisionCount! >= 1, 'Executor executed revision directive');
   assert(completed.finalResult?.criticAuditScore! >= 90, `Critic approved final plan with score ${completed.finalResult?.criticAuditScore}`);
+  assert(completed.persistedMemories.length > 0, `Turn 1 persisted ${completed.persistedMemories.length} new knowledge vectors into Qdrant`);
 
-  // TEST SUITE 6: Human Override Signal (Workflow Cancellation mid-flight)
-  console.log('\n▶ [SUITE 6] Human Override & Workflow Cancellation');
+  // TEST SUITE 6: Multi-Turn Cross-Session Retrieval (Turn 2)
+  console.log('\n▶ [SUITE 6] Multi-Turn Cross-Session Retrieval (Turn 2: Querying Prior Session Facts)');
+  const turn2Prompt =
+    'What did we decide about the presentation time limit and video rehearsal guardrail in our previous session?';
+  const turn2Wf = createInitialWorkflow(turn2Prompt, 'browser_dev');
+  const turn2Completed = await executeMultiAgentWorkflow(turn2Wf);
+
+  assert(turn2Completed.status === 'completed', 'Turn 2 workflow reached status: completed');
+  const turn2Memories = turn2Completed.retrievedMemories || [];
+  const foundPriorLearning = turn2Memories.some(
+    (m) => m.content.toLowerCase().includes('critic') || m.content.toLowerCase().includes('hackathon') || m.content.toLowerCase().includes('guardrail') || m.content.toLowerCase().includes('outcome')
+  );
+  assert(foundPriorLearning, 'Turn 2 Memory Agent semantically retrieved knowledge persisted during Turn 1');
+
+  // TEST SUITE 7: Human Override Signal (Workflow Cancellation mid-flight)
+  console.log('\n▶ [SUITE 7] Human Override & Workflow Cancellation');
   const cancelController = new AbortController();
   const cancelWf = createInitialWorkflow('Task that will be cancelled by user', 'browser_dev');
 
@@ -137,8 +152,8 @@ async function runAllTests() {
   });
   assert(cancelledResult.status === 'cancelled', 'Workflow halted cleanly with status: cancelled on AbortSignal');
 
-  // TEST SUITE 7: Selective Stage Retry
-  console.log('\n▶ [SUITE 7] Selective Stage Retry');
+  // TEST SUITE 8: Selective Stage Retry
+  console.log('\n▶ [SUITE 8] Selective Stage Retry');
   const retriedResult = await retryWorkflowStage(completed, 'critic');
   assert(retriedResult.status === 'completed', 'Selective retry from Critic stage completed successfully');
   assert(Boolean(retriedResult.finalResult), 'Final result synthesized after selective retry');

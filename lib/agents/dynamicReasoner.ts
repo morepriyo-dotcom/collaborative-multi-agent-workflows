@@ -579,7 +579,7 @@ export function dynamicSynthesizeResult(
   ];
 
   // Dynamic high-value memories to persist into Qdrant
-  const newMemoriesToPersist = [
+  const newMemoriesToPersist: Array<{ content: string; category: string; importance: number; tags: string[] }> = [
     {
       content: `Workflow Outcome for "${intent.goal}": Completed 7-agent collaboration with Critic score ${criticReview.score}/100 (${criticReview.reviewStatus}).`,
       category: 'system_learning',
@@ -591,6 +591,12 @@ export function dynamicSynthesizeResult(
       category: 'preference',
       importance: 4,
       tags: ['best_practice', intent.domain.toLowerCase().replace(/\s+/g, '_')],
+    },
+    {
+      content: `Session Decision for ${intent.goal}: Enforce strict 4:30 rehearsal timecode guardrail with 30-second buffer to resolve historical presentation video overflow pitfall.`,
+      category: 'hackathon_experience',
+      importance: 5,
+      tags: ['presentation_limit', 'timecode_guardrail', 'rehearsal_buffer', 'hackathon_pitfall'],
     },
   ];
 

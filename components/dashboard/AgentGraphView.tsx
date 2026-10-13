@@ -53,6 +53,19 @@ export const AgentGraphView: React.FC<AgentGraphViewProps> = ({
             Done
           </span>
         );
+      case 'retrying':
+        return (
+          <span className="flex items-center gap-1 text-[10px] uppercase font-bold text-amber-300 bg-amber-950/80 px-2 py-0.5 rounded-full border border-amber-500/40 animate-pulse">
+            <RefreshCw className="h-2.5 w-2.5 animate-spin" />
+            Retrying
+          </span>
+        );
+      case 'cancelled':
+        return (
+          <span className="text-[10px] uppercase font-bold text-slate-400 bg-slate-900/80 px-2 py-0.5 rounded-full border border-slate-700">
+            Cancelled
+          </span>
+        );
       case 'failed':
         return (
           <span className="text-[10px] uppercase font-bold text-rose-400 bg-rose-950/80 px-2 py-0.5 rounded-full border border-rose-500/40">
@@ -62,7 +75,7 @@ export const AgentGraphView: React.FC<AgentGraphViewProps> = ({
       default:
         return (
           <span className="text-[10px] uppercase font-medium text-slate-500 bg-slate-900/60 px-2 py-0.5 rounded-full border border-slate-800">
-            Waiting
+            Pending
           </span>
         );
     }

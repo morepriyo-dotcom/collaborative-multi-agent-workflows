@@ -59,6 +59,15 @@ function saveLocalStore(records: StoredMemoryRecord[]) {
   }
 }
 
+export async function getStoredMemoryCount(): Promise<number> {
+  const records = loadLocalStore();
+  if (records.length === 0) {
+    await seedInitialMemoriesIfEmpty();
+    return loadLocalStore().length;
+  }
+  return records.length;
+}
+
 /**
  * Initialize Qdrant collection if not exists
  */

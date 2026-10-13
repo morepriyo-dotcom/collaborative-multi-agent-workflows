@@ -1,4 +1,31 @@
-import { runLyzrInference } from '../lyzr/client';
+import { runLyzrInference, createLyzrAgent } from '../lyzr/client';
+import { LYZR_AGENT_DEFINITIONS } from '../lyzr/agentFactory';
+
+const lyzrAgentIdCache: Record<string, string> = {};
+
+async function resolveLyzrAgentId(role?: string): Promise<string | undefined> {
+  if (!role) return undefined;
+  if (lyzrAgentIdCache[role]) return lyzrAgentIdCache[role];
+
+  const def = (LYZR_AGENT_DEFINITIONS as any)[role];
+  if (!def) return undefined;
+
+  try {
+    const res = await createLyzrAgent({
+      name: def.name,
+      description: def.description,
+      agent_role: role,
+      agent_instructions: def.instructions,
+    });
+    if (res?.agent_id) {
+      lyzrAgentIdCache[role] = res.agent_id;
+      return res.agent_id;
+    }
+  } catch (err) {
+    console.warn(`[Lyzr] Failed to register agent for role ${role}:`, err);
+  }
+  return undefined;
+}
 
 export type LLMProvider = 'lyzr' | 'gemini' | 'openai' | 'local_heuristic';
 
@@ -25,24 +52,27 @@ export async function executeAgentLLMWithMeta(options: LLMRequestOptions): Promi
 
   // 1. Lyzr Agent Studio (if configured)
   const lyzrKey = process.env.LYZR_API_KEY;
-  if (lyzrKey && lyzrKey !== 'your_lyzr_api_key_here' && agentId) {
-    try {
-      const lyzrResponse = await runLyzrInference({
-        user_id: 'flowmesh_user',
-        agent_id: agentId,
-        session_id: `flowmesh_session_${Date.now()}`,
-        message: `${systemPrompt}\n\nTask:\n${userPrompt}`,
-      });
+  if (lyzrKey && lyzrKey !== 'your_lyzr_api_key_here') {
+    const targetAgentId = agentId || (await resolveLyzrAgentId(options.agentRole));
+    if (targetAgentId) {
+      try {
+        const lyzrResponse = await runLyzrInference({
+          user_id: 'flowmesh_user',
+          agent_id: targetAgentId,
+          session_id: `flowmesh_session_${Date.now()}`,
+          message: `${systemPrompt}\n\nTask:\n${userPrompt}`,
+        });
 
-      if (lyzrResponse?.response) {
-        return {
-          text: lyzrResponse.response,
-          provider: 'lyzr',
-          modelUsed: 'Lyzr Agent Studio v3 (gpt-4o)',
-        };
+        if (lyzrResponse?.response) {
+          return {
+            text: lyzrResponse.response,
+            provider: 'lyzr',
+            modelUsed: 'Lyzr Agent Studio v3 (gpt-4o)',
+          };
+        }
+      } catch (err) {
+        console.warn('[LLM] Lyzr Agent Studio request failed, falling through:', err);
       }
-    } catch (err) {
-      console.warn('[LLM] Lyzr Agent Studio request failed, falling through:', err);
     }
   }
 

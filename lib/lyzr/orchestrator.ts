@@ -407,6 +407,11 @@ export async function executeMultiAgentWorkflow(
         criticAuditScore: criticOutput?.score ?? 95,
         criticStatus: criticOutput?.reviewStatus || 'APPROVED',
         revisionPerformed: Boolean(state.agents.executor.revisionCount && state.agents.executor.revisionCount > 0),
+        completedTasks: synthOutput.completedTasks || [],
+        outstandingTasks: synthOutput.pendingOrActionableItems || [],
+        sources: researchOutput?.sourceCitations || [],
+        memoryRetrievalCount: memoryOutput?.retrievedCount ?? state.retrievedMemories.length,
+        memoryPersistCount: persistedMemories.length,
       };
     }
 

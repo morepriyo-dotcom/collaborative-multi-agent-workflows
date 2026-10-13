@@ -1,7 +1,7 @@
 'use client';
 
 import React from 'react';
-import { X, Clock, Cpu, CheckCircle2, AlertTriangle, Database, RefreshCw } from 'lucide-react';
+import { X, Clock, Cpu, AlertTriangle, ArrowRight, ShieldAlert, CheckCircle2, RefreshCw } from 'lucide-react';
 import { AgentExecutionState, AgentRole } from '@/types/agent';
 
 interface AgentInspectorModalProps {
@@ -14,6 +14,27 @@ export const AgentInspectorModal: React.FC<AgentInspectorModalProps> = ({
   onClose,
 }) => {
   if (!agent) return null;
+
+  const getStatusDisplay = (status: AgentExecutionState['status']) => {
+    switch (status) {
+      case 'running':
+        return { label: 'RUNNING', color: 'text-indigo-400 bg-indigo-950/80 border-indigo-500/40' };
+      case 'revising':
+        return { label: 'REVISION REQUIRED', color: 'text-amber-400 bg-amber-950/80 border-amber-500/40' };
+      case 'completed':
+        return { label: 'COMPLETED', color: 'text-emerald-400 bg-emerald-950/80 border-emerald-500/40' };
+      case 'failed':
+        return { label: 'FAILED', color: 'text-rose-400 bg-rose-950/80 border-rose-500/40' };
+      case 'retrying':
+        return { label: 'RETRYING', color: 'text-amber-300 bg-amber-950/80 border-amber-500/40' };
+      case 'cancelled':
+        return { label: 'CANCELLED', color: 'text-slate-400 bg-slate-900 border-slate-700' };
+      default:
+        return { label: 'PENDING', color: 'text-slate-400 bg-slate-900 border-slate-800' };
+    }
+  };
+
+  const statusInfo = getStatusDisplay(agent.status);
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/75 backdrop-blur-sm animate-in fade-in duration-200">
@@ -48,20 +69,62 @@ export const AgentInspectorModal: React.FC<AgentInspectorModalProps> = ({
           <div className="grid grid-cols-3 gap-3 bg-slate-950/40 p-3 rounded-xl border border-slate-800 text-xs">
             <div>
               <span className="text-slate-500 block text-[11px]">Execution Status</span>
-              <span className="font-semibold text-indigo-400 uppercase tracking-wide">
-                {agent.status}
+              <span className={`inline-block font-semibold uppercase tracking-wide px-2 py-0.5 rounded-full text-[10px] border mt-0.5 ${statusInfo.color}`}>
+                {statusInfo.label}
               </span>
             </div>
             <div>
               <span className="text-slate-500 block text-[11px]">Execution Latency</span>
-              <span className="font-mono text-slate-200 flex items-center gap-1">
+              <span className="font-mono text-slate-200 flex items-center gap-1 mt-0.5">
                 <Clock className="h-3 w-3 text-slate-400" />
                 {agent.durationMs ? `${(agent.durationMs / 1000).toFixed(2)}s` : 'N/A'}
               </span>
             </div>
             <div>
               <span className="text-slate-500 block text-[11px]">Orchestrator Provider</span>
-              <span className="font-medium text-emerald-400">Lyzr Studio / Framework</span>
+              <span className="font-medium text-emerald-400 mt-0.5 block">
+                {agent.provider === 'lyzr' ? 'Lyzr Agent Studio v3' : 'Lyzr Standby Orchestrator'}
+              </span>
+            </div>
+          </div>
+
+          {/* Error Banner if any */}
+          {agent.error && (
+            <div className="p-3.5 rounded-xl bg-rose-950/50 border border-rose-500/40 text-xs text-rose-200 space-y-1">
+              <div className="flex items-center gap-1.5 font-bold text-rose-300">
+                <AlertTriangle className="h-4 w-4 text-rose-400" />
+                <span>Execution Error Encountered</span>
+              </div>
+              <p className="font-mono text-[11px] text-rose-300">{agent.error}</p>
+            </div>
+          )}
+
+          {/* Input Summary */}
+          <div>
+            <h4 className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2 flex items-center gap-1.5">
+              <ArrowRight className="h-3.5 w-3.5 text-indigo-400" />
+              Input Context &amp; Objectives
+            </h4>
+            <div className="p-3.5 rounded-xl bg-slate-950/70 border border-slate-800 text-slate-300 font-sans text-xs leading-relaxed">
+              {agent.input ? (
+                <pre className="font-mono text-[11px] overflow-x-auto whitespace-pre-wrap">
+                  {JSON.stringify(agent.input, null, 2)}
+                </pre>
+              ) : agent.dependencies.length > 0 ? (
+                <span>Received upstream structured context from: <strong className="text-indigo-300">{agent.dependencies.join(', ')}</strong></span>
+              ) : (
+                <span>Direct user voice/text request ingestion</span>
+              )}
+            </div>
+          </div>
+
+          {/* Output Summary */}
+          <div>
+            <h4 className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">
+              Agent Output Summary
+            </h4>
+            <div className="p-3.5 rounded-xl bg-slate-950/70 border border-slate-800 text-slate-200 font-sans text-xs leading-relaxed">
+              {agent.outputSummary || 'Agent has not completed execution yet.'}
             </div>
           </div>
 
@@ -84,25 +147,15 @@ export const AgentInspectorModal: React.FC<AgentInspectorModalProps> = ({
             </div>
           )}
 
-          {/* Safe Output Summary */}
-          <div>
-            <h4 className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">
-              Agent Output Summary
-            </h4>
-            <div className="p-3.5 rounded-xl bg-slate-950/70 border border-slate-800 text-slate-200 font-sans text-xs leading-relaxed">
-              {agent.outputSummary || 'Agent has not completed execution yet.'}
-            </div>
-          </div>
-
           {/* Detailed Result Inspection */}
           {agent.detailedResult && (
             <div>
               <h4 className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2 flex items-center justify-between">
                 <span>Structured Agent Telemetry</span>
-                <span className="text-[10px] text-slate-500 font-normal">Safe Sanitized JSON</span>
+                <span className="text-[10px] text-slate-500 font-normal">Sanitized JSON</span>
               </h4>
               <div className="p-3.5 rounded-xl bg-[#0b0f17] border border-slate-800/90 font-mono text-[11px] text-slate-300 overflow-x-auto max-h-60 leading-normal">
-                <pre>{JSON.stringify(agent.detailedResult, null, 2)}</pre>
+                <pre>{typeof agent.detailedResult === 'string' ? agent.detailedResult : JSON.stringify(agent.detailedResult, null, 2)}</pre>
               </div>
             </div>
           )}

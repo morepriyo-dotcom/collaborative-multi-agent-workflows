@@ -10,11 +10,14 @@ export type AgentRole =
 
 export type AgentStatus =
   | 'idle'
+  | 'pending'
   | 'waiting'
   | 'running'
   | 'completed'
   | 'revising'
-  | 'failed';
+  | 'retrying'
+  | 'failed'
+  | 'cancelled';
 
 export interface AgentExecutionState {
   id: string;

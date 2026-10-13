@@ -11,6 +11,9 @@ import {
   ShieldCheck,
   Sparkles,
   Award,
+  BookOpen,
+  ListTodo,
+  ExternalLink,
 } from 'lucide-react';
 import { WorkflowExecution } from '@/types/workflow';
 
@@ -35,9 +38,21 @@ export const FinalResultView: React.FC<FinalResultViewProps> = ({ workflow }) =>
   const handleCopyMarkdown = () => {
     let md = `# ${result.title}\n\n`;
     md += `## Executive Summary\n${result.executiveSummary}\n\n`;
-    md += `## Critic Verification Score: ${result.criticAuditScore}/100 (${result.criticStatus})\n\n`;
-    md += `## Execution Phases\n\n`;
+    md += `## Critic Verification: ${result.criticAuditScore}/100 (${result.criticStatus})\n\n`;
+    
+    if (result.completedTasks && result.completedTasks.length > 0) {
+      md += `## Completed Tasks\n`;
+      result.completedTasks.forEach((t) => (md += `- [x] ${t}\n`));
+      md += `\n`;
+    }
 
+    if (result.outstandingTasks && result.outstandingTasks.length > 0) {
+      md += `## Outstanding Tasks\n`;
+      result.outstandingTasks.forEach((t) => (md += `- [ ] ${t}\n`));
+      md += `\n`;
+    }
+
+    md += `## Execution Phases\n\n`;
     result.phases.forEach((p: any) => {
       md += `### Phase ${p.phaseNumber}: ${p.title} (${p.timeframe}) - Priority ${p.priority}\n`;
       p.checklist.forEach((item: string) => {
@@ -45,6 +60,12 @@ export const FinalResultView: React.FC<FinalResultViewProps> = ({ workflow }) =>
       });
       md += `\n`;
     });
+
+    if (result.sources && result.sources.length > 0) {
+      md += `## Relevant Sources & Guidelines\n`;
+      result.sources.forEach((s) => (md += `- ${s}\n`));
+      md += `\n`;
+    }
 
     navigator.clipboard.writeText(md);
     setCopied(true);
@@ -56,7 +77,7 @@ export const FinalResultView: React.FC<FinalResultViewProps> = ({ workflow }) =>
       {/* Title & Status Badge */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 pb-6 border-b border-slate-800">
         <div>
-          <div className="flex items-center gap-2 mb-2">
+          <div className="flex items-center gap-2 mb-2 flex-wrap">
             <span className="px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-emerald-950/80 text-emerald-300 border border-emerald-500/30 flex items-center gap-1">
               <CheckCircle2 className="h-3 w-3" />
               Consolidated Multi-Agent Output
@@ -67,6 +88,9 @@ export const FinalResultView: React.FC<FinalResultViewProps> = ({ workflow }) =>
                 Critic Verified &amp; Self-Corrected
               </span>
             )}
+            <span className="px-2.5 py-0.5 rounded-full text-[11px] font-medium bg-cyan-950/60 text-cyan-300 border border-cyan-800 font-mono">
+              Qdrant Memory: {result.memoryRetrievalCount ?? workflow.retrievedMemories.length} retrieved, {result.memoryPersistCount ?? workflow.persistedMemories.length} persisted
+            </span>
           </div>
           <h2 className="text-2xl font-bold text-white tracking-tight">{result.title}</h2>
         </div>
@@ -79,10 +103,10 @@ export const FinalResultView: React.FC<FinalResultViewProps> = ({ workflow }) =>
             </div>
             <div>
               <span className="text-[10px] text-slate-400 uppercase font-semibold block">
-                Critic Audit Score
+                Critic Verification
               </span>
               <span className="text-base font-extrabold text-emerald-400">
-                {result.criticAuditScore} / 100
+                {result.criticAuditScore} / 100 ({result.criticStatus})
               </span>
             </div>
           </div>
@@ -106,6 +130,48 @@ export const FinalResultView: React.FC<FinalResultViewProps> = ({ workflow }) =>
         </h4>
         <p>{result.executiveSummary}</p>
       </div>
+
+      {/* Completed & Outstanding Tasks Split */}
+      {((result.completedTasks && result.completedTasks.length > 0) ||
+        (result.outstandingTasks && result.outstandingTasks.length > 0)) && (
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          {/* Completed Tasks */}
+          {result.completedTasks && result.completedTasks.length > 0 && (
+            <div className="p-4 rounded-xl bg-slate-900/50 border border-slate-800">
+              <h4 className="text-xs font-bold text-emerald-400 uppercase tracking-wider mb-3 flex items-center gap-1.5">
+                <CheckCircle2 className="h-3.5 w-3.5" />
+                Completed Workflow Tasks
+              </h4>
+              <ul className="space-y-1.5 text-xs text-slate-300">
+                {result.completedTasks.map((task, idx) => (
+                  <li key={idx} className="flex items-start gap-2">
+                    <span className="text-emerald-400 font-bold shrink-0">✓</span>
+                    <span>{task}</span>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
+
+          {/* Outstanding / Actionable Tasks */}
+          {result.outstandingTasks && result.outstandingTasks.length > 0 && (
+            <div className="p-4 rounded-xl bg-slate-900/50 border border-slate-800">
+              <h4 className="text-xs font-bold text-amber-400 uppercase tracking-wider mb-3 flex items-center gap-1.5">
+                <ListTodo className="h-3.5 w-3.5" />
+                Outstanding Action Items
+              </h4>
+              <ul className="space-y-1.5 text-xs text-slate-300">
+                {result.outstandingTasks.map((task, idx) => (
+                  <li key={idx} className="flex items-start gap-2">
+                    <span className="h-1.5 w-1.5 rounded-full bg-amber-400 mt-1.5 shrink-0" />
+                    <span>{task}</span>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
+        </div>
+      )}
 
       {/* Phases Grid */}
       <div className="space-y-4">
@@ -215,6 +281,24 @@ export const FinalResultView: React.FC<FinalResultViewProps> = ({ workflow }) =>
               );
             })}
           </div>
+        </div>
+      )}
+
+      {/* Relevant Sources & Frameworks */}
+      {result.sources && result.sources.length > 0 && (
+        <div className="p-4 rounded-xl bg-slate-900/60 border border-slate-800 space-y-2">
+          <h4 className="text-xs font-bold text-slate-300 uppercase tracking-wider flex items-center gap-1.5">
+            <BookOpen className="h-3.5 w-3.5 text-indigo-400" />
+            Relevant Sources &amp; Verification References
+          </h4>
+          <ul className="space-y-1 text-xs text-slate-400">
+            {result.sources.map((source, idx) => (
+              <li key={idx} className="flex items-center gap-2">
+                <span className="h-1 w-1 rounded-full bg-slate-500" />
+                <span>{source}</span>
+              </li>
+            ))}
+          </ul>
         </div>
       )}
 

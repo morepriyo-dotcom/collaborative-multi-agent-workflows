@@ -50,6 +50,11 @@ export interface WorkflowExecution {
     criticAuditScore: number;
     criticStatus: string;
     revisionPerformed: boolean;
+    completedTasks?: string[];
+    outstandingTasks?: string[];
+    sources?: string[];
+    memoryRetrievalCount?: number;
+    memoryPersistCount?: number;
   };
   pausedAtStage?: string;
   error?: string;

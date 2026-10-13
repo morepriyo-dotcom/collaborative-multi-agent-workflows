@@ -11,8 +11,12 @@ interface VoiceInputHeroProps {
 
 const DEMO_PRESETS = [
   {
-    label: 'Official Hackathon Demo',
-    text: 'Help me prepare for my upcoming AI hackathon. Remember my previous project experience, research what I need to prepare, identify my weak areas, create a prioritized preparation plan, and check whether the plan covers everything.',
+    label: 'Official Hackathon Demo (Turn 1)',
+    text: 'Help me prepare for an AI hackathon. Identify the required deliverables, research the available requirements, create a prioritized checklist, verify the checklist for missing items, and remember my progress for my next session.',
+  },
+  {
+    label: 'Memory Recall Query (Turn 2)',
+    text: 'What did we decide about the presentation time limit and video rehearsal guardrail in our previous session?',
   },
   {
     label: 'Enterprise Microservices System',
@@ -34,6 +38,7 @@ export const VoiceInputHero: React.FC<VoiceInputHeroProps> = ({
   const [transcript, setTranscript] = useState(DEMO_PRESETS[0].text);
   const [recognitionSupported, setRecognitionSupported] = useState(false);
   const [omiWebhookStatus, setOmiWebhookStatus] = useState<string | null>(null);
+  const [micError, setMicError] = useState<string | null>(null);
   const recognitionRef = useRef<any>(null);
 
   useEffect(() => {
@@ -56,12 +61,20 @@ export const VoiceInputHero: React.FC<VoiceInputHeroProps> = ({
           if (currentTranscript.trim()) {
             setTranscript(currentTranscript);
             setActiveSource('browser_dev');
+            setMicError(null);
           }
         };
 
         recognition.onerror = (err: any) => {
           console.warn('Speech recognition error:', err);
           setIsRecording(false);
+          if (err.error === 'not-allowed') {
+            setMicError('Microphone permission denied. Please allow microphone access or type your task below.');
+          } else if (err.error === 'no-speech') {
+            setMicError('No speech detected. Please try speaking again or use direct text input.');
+          } else {
+            setMicError(`Voice capture issue: ${err.error || 'Check microphone input.'}`);
+          }
         };
 
         recognition.onend = () => {
@@ -211,6 +224,21 @@ export const VoiceInputHero: React.FC<VoiceInputHeroProps> = ({
           <div className="mb-4 inline-flex items-center gap-2 px-3 py-1 rounded-full bg-emerald-950/80 border border-emerald-500/50 text-xs text-emerald-300 animate-in fade-in">
             <CheckCircle2 className="h-3.5 w-3.5 text-emerald-400" />
             <span>{omiWebhookStatus}</span>
+          </div>
+        )}
+
+        {micError && (
+          <div className="mb-4 flex items-center justify-between gap-2 px-4 py-2 rounded-xl bg-rose-950/80 border border-rose-500/50 text-xs text-rose-200 max-w-xl mx-auto animate-in fade-in">
+            <div className="flex items-center gap-2">
+              <span className="font-bold text-rose-400">Microphone:</span>
+              <span>{micError}</span>
+            </div>
+            <button
+              onClick={() => setMicError(null)}
+              className="text-xs text-rose-400 hover:text-white"
+            >
+              ✕
+            </button>
           </div>
         )}
 
